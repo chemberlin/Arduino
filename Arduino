@@ -1,0 +1,346 @@
+#include <LiquidCrystal.h>   
+#include <Keypad.h>
+#include <SPI.h> // librairie SPI - obligatoire avec librairie Ethernet
+#include <Ethernet.h> // librairie Ethernet
+#include <MySQL_Connection.h> // librairie MySQL
+#include <MySQL_Cursor.h> // librairie MySQL Curseur pour parcourir les enregistrements d'une table dans une base de données MySQL
+
+
+const byte ROWS = 4; 
+const byte COLS = 3; 
+char keys[ROWS][COLS] = {
+  {'1','2','3'},
+  {'4','5','6'},
+  {'7','8','9'},
+  {'*','0','#'}
+};
+
+byte rowPins[ROWS] = {A3,A2,A1,A0}; //connect to the row pinouts of the keypad
+byte colPins[COLS] = {9,8,7}; //connect to the column pinouts of the keypad
+Keypad keypad = Keypad( makeKeymap(keys), rowPins, colPins, ROWS, COLS );
+LiquidCrystal lcd (A5,A4,2,3,5,6);
+//------------------------------------------
+char Data[5]; //4 est le nombre de caractères qu'il peut contenir + le caractère nul = 5
+char Data2[5];
+byte data_count = 0, data_count2 = 0, master_count = 0; 
+
+int A= 0 ; 
+char  Key;
+char  Key2;
+
+struct Record_Emp
+{
+ int nb;
+ String Matricule; 
+ String Prenom; 
+ String Nom;
+};
+
+Record_Emp Emp;
+//--- l'adresse mac = identifiant unique du shield
+// Ã  fixer arbitrairement ou en utilisant l'adresse imprimÃ©e sur l'Ã©tiquette du shield
+byte mac[] = {  0x90, 0xA2, 0xDA, 0x00, 0x1A, 0x71 };
+
+//----- l'adresse IP fixe Ã  utiliser pour le shield Ethernet ---
+IPAddress ipLocal(192, 168, 1, 100); // l'adresse IP locale du shield Ethernet
+
+//----- l'adresse de la passerelle rÃ©seau ---
+IPAddress passerelle(192, 168, 1, 1); // l'adresse du poste de connexion Ã  internet ou de la box
+
+//----- masque de sous rÃ©seau
+IPAddress masque(255, 255, 255, 0 ); // idem masque sous-rÃ©seau des autres postes du rÃ©seau et de la box : 255.255.255.0 par dÃ©faut
+
+//----- l'adresse IP du serveur DNS Ã  utiliser ---
+IPAddress serveurDNS(192, 168, 1, 1); // l'adresse du serveur DNS
+
+
+
+
+IPAddress server_addr(192, 168, 1, 101); // l'adresse du serveur MySQL *server* here
+char user[] = "arduino"; // MySQL user login username
+char password[] = "arduino"; // MySQL user login password
+
+EthernetClient client;
+MySQL_Connection conn((Client *)&client);
+
+
+void setup()
+{
+  lcd.begin(16,4);
+  lcd.setCursor(0, 0);
+  lcd.print("Bienvenue");
+  delay(1000);
+    
+
+
+Ethernet.begin(mac, ipLocal, serveurDNS, passerelle, masque); // forme complÃ¨te
+
+  delay(800); // donne le temps Ã  la carte Ethernet de s'initialiser
+  //lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("Bienvenue @ IP : ");
+  //delay(600);
+  
+  lcd.setCursor(0, 1);
+  lcd.print(Ethernet.localIP());
+
+  delay(10000);
+  lcd.clear();
+
+Verification_MAT(char MAT[5],char PWD[5], int T),
+  
+}
+//---------------------------------------------------------------------------------------
+void loop () {
+
+      
+  switch (A) {
+  case 0: 
+   
+   
+     Connection_BD();
+      
+     break;
+  case 1: 
+   
+      MAT();
+      
+     break;
+  case 2: 
+        
+      mdp();
+      
+    break;
+  case 3:
+     lcd.clear(); 
+     lcd.println("Bonjour Mr. : ");
+     lcd.print(Emp.Prenom); 
+     lcd.print(" ");
+     lcd.print(Emp.Nom); 
+     delay(5000);
+     lcd.clear();
+     A=4;
+    break;
+    case 4:
+    Deconnection_BD();
+    
+   
+     
+      
+    break;   
+  }
+}
+
+
+void Connection_BD()
+{
+lcd.clear();
+//Serial.println("Connecting Base Mysql...");
+lcd.print("Connecting Base Mysql...");
+delay(1000);
+
+  if (conn.connect(server_addr, 3306, user, password)) {
+    lcd.clear();
+  //  Serial.println("Connecting OK...");
+    lcd.print("Connecting OK...");
+    delay(500); 
+    lcd.clear();
+    A=1;       
+  }
+  else
+  {
+    lcd.clear();
+    //Serial.println("Connection failed.");
+    lcd.print("Connection failed.");
+    delay(500);
+    lcd.clear();
+    A=0; 
+  }
+ 
+}
+
+//-----------------------------------------------------------------------------------
+
+
+void Deconnection_BD()
+
+{
+    conn.close();
+    lcd.clear();
+    lcd.print("Deconnection");
+    delay(1000);
+    lcd.clear();
+    A=0;
+    setup();
+}  
+
+//-----------------------------------------------------------------------------------
+
+bool Verification_MAT(char MAT[5],char PWD[5], int T)
+{
+ 
+char query[128];
+int nbre=0;
+
+String nb;
+  switch (A) {
+  case 0: 
+   sprintf(query,"SELECT COUNT(*) FROM bd_serrure.employee WHERE MATRICULE = %s", MAT);
+   
+   
+      
+     break;:
+switch (A) {
+  case 1: 
+{
+  sprintf(query,"SELECT COUNT(*),MATRICULE,PRENOM,NOM FROM bd_serrure.employee WHERE MATRICULE = %s AND CODE = %s", MAT, PWD); 
+  sprintf(query,"INSERT INTO bd_serrure.entree_sortie (ACTION, MATRICULE) VALUES ('%s','%s')", "ENTREE", Emp.Matricule); 
+  
+}   
+     break;:
+}
+//**************
+
+  MySQL_Cursor *cur_mem = new MySQL_Cursor(&conn);
+
+  // Execute the query
+  cur_mem->execute(query);
+  // Fetch the columns and print them
+  column_names *cols = cur_mem->get_columns();
+  // Read the rows and print them
+  row_values *row = NULL;
+  do {
+    row = cur_mem->get_next_row();
+    
+    if (row != NULL) {
+      nb = row->values[0];
+      nbre = nb.toInt();
+
+      Emp.nb = row->values[0];
+      Emp.Matricule = row->values[1];
+      Emp.Prenom = row->values[2];
+      Emp.Nom = row->values[3];           
+      }
+      
+  } while (row != NULL);
+
+  
+  delete cur_mem;
+  
+
+//**************  
+
+
+   
+
+ 
+ if (nbre > 0 )
+ return true;
+ else
+ return false;
+
+
+}
+
+//--------------------------------------------------------------------------------------
+
+
+
+//--------------------------------------------------------------------------------------
+
+  void clearData()
+{
+  while (data_count != 0)
+  {
+    Data[data_count--] = 0; // efface le tableau pour les nouvelles données
+  }
+  return;
+}
+
+void clearData2()
+{
+  while (data_count2 != 0)
+  {
+    Data2[data_count2--] = 0; // efface le tableau pour les nouvelles données
+  }
+  return;
+}
+//-----------------------------------------------------------------------------------
+
+void MAT(){
+  lcd.setCursor(0, 0);
+  lcd.print(" Matricule : ");
+  
+char key = keypad.getKey();
+  if ((key!= NO_KEY)&&(key!='*'))//s'assure qu'une touche est effectivement enfoncée sauf la touche  "*" 
+                 {
+                  Data[data_count] = key;  //stocker char dans un tableau de données
+                  lcd.setCursor(data_count, 1); // déplace le curseur pour afficher chaque nouveau caractère
+                  lcd.print(Data[data_count]); // affiche le caractère sur lemplacement du curseur
+                  data_count++; // incrémente le tableau de données de 1 pour stocker le nouveau caractère
+                }
+ if (key=='*')  // si "*" est enfoncée comparer  data a master
+ {
+  if (Verification_MAT(Data,Data2,1)==true) // ****cette etape sera modifier avec une requete mysql***
+       {
+        lcd.clear();
+        lcd.print("Matricule Valide");
+        delay(1000);
+        lcd.clear();
+        A = 2;
+      }    
+    else
+     { 
+      lcd.clear();
+      lcd.print("Mauvaise Matricule");
+      delay(1000);
+      lcd.clear();
+     
+      A = 1;
+      }
+    }
+  
+     
+}
+//-----------------------------------------------------------------------------------
+void mdp ()
+{
+  lcd.setCursor(0, 0);
+  lcd.print("Mot de passe:");
+
+char key = keypad.getKey();
+ if ((key!= NO_KEY)&&(key!='*'))
+  {
+    Data2[data_count2] = key; 
+    lcd.setCursor(data_count2, 1); 
+    lcd.print(Data2[data_count2]); 
+    data_count2++; 
+  }
+ if (key=='*') 
+ {
+if (Verification_MAT(Data,Data2,2)==true)   // ****cette etape sera modifier avec une requete mysql***
+       {
+        lcd.clear();
+        lcd.setCursor(0, 0);
+        lcd.print("Mot de passe");
+        lcd.setCursor(0, 1);
+        lcd.print("valide");
+        delay(1000);
+        lcd.clear();
+        A = 3;
+      }    
+    else
+     { 
+      lcd.clear();
+      lcd.setCursor(0, 0);
+      lcd.print("mauvais");
+      lcd.setCursor(0, 1);
+      lcd.print("Mot de passe");
+      delay(1000);
+      lcd.clear();
+      A = 2;
+      }
+    clearData();
+    clearData2();  
+}
+}
